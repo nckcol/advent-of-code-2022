@@ -1,15 +1,11 @@
 import * as setOperations from "https://deno.land/x/set_operations@v1.0.3/set_operations.ts";
+import { chunk } from "https://deno.land/std@0.115.1/collections/chunk.ts";
 
 function parseInput(input: string) {
   return input
     .split("\n")
     .filter(Boolean)
-    .map((rucksackString) => [
-      new Set(
-        Array.from(rucksackString.substring(0, rucksackString.length / 2))
-      ),
-      new Set(Array.from(rucksackString.substring(rucksackString.length / 2))),
-    ]);
+    .map((rucksackString) => new Set(Array.from(rucksackString)));
 }
 
 function calculateItemPriority(item: string) {
@@ -31,17 +27,16 @@ function sum(a: number, b: number) {
 const input = await Deno.readTextFile("./input.txt");
 const rucksackList = parseInput(input);
 
-const result = rucksackList
-  .map((compartments) => {
-    const intersection = setOperations.intersection(
-      compartments[0],
-      compartments[1]
-    );
+const result = chunk(rucksackList, 3)
+  .map((racksackGroup) => {
+    const intersection = racksackGroup.reduce(setOperations.intersection);
+
     if (intersection.size !== 1) {
       throw new Error(
-        "There must be exactly one item in common both compartments"
+        "There must be exactly one item common in racksack group"
       );
     }
+
     return intersection.values().next().value;
   })
   .map(calculateItemPriority)
