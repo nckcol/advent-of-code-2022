@@ -39,11 +39,8 @@ const input = await Deno.readTextFile("./input.txt");
 const { crates, instructions } = parseInput(input);
 
 for (const { count, from, to } of instructions) {
-  for (let i = 0; i < count; i++) {
-    const crate = crates[from - 1].shift();
-    invariant(crate, `No crate to move from stack ${from}`);
-    crates[to - 1].unshift(crate);
-  }
+  const moved = crates[from - 1].splice(0, count);
+  crates[to - 1].unshift(...moved);
 }
 
 console.log(crates.map((crate) => crate[0]).join(""));
