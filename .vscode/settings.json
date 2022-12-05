@@ -1,4 +1,6 @@
 {
-    "deno.enable": true,
-    "editor.formatOnSave": true
+  "deno.enable": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "EditorConfig.EditorConfig",
+  "files.trimTrailingWhitespace": false
 }
