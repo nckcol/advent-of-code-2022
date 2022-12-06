@@ -1,4 +1,4 @@
-const MARKER_SIZE = 4;
+const MARKER_SIZE = 14;
 let marker: string[] = [];
 const input = await Deno.readTextFile("./input.txt");
 
