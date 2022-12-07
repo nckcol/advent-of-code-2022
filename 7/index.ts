@@ -1,5 +1,7 @@
 import { FileSystem, FileSystemNode } from "./fs.ts";
 
+type DirectoryStats = { path: FileSystemNode[]; size: number };
+
 class CommandInfo {
   output: (FileInfo | DirectoryInfo)[] = [];
 
@@ -62,7 +64,12 @@ function pathString(path: FileSystemNode[]) {
     .join("");
 }
 
-const MAX_DIR_SIZE = 100000;
+function compareSizeAsc(a: DirectoryStats, b: DirectoryStats) {
+  return a.size - b.size;
+}
+
+const FS_SIZE = 70000000;
+const UPDATE_SIZE = 30000000;
 const fs = new FileSystem();
 let cwd: string[] = [];
 const commandLog = parseInput(await Deno.readTextFile("./input.txt"));
@@ -98,26 +105,35 @@ for (const command of commandLog) {
   }
 }
 
-const filteredDirInfo: { path: FileSystemNode[]; size: number }[] = [];
+const dirStats: DirectoryStats[] = [];
 
-fs.traverse((path: FileSystemNode[], sizes: number[]) => {
-  const top = path.at(-1);
+const totalSpaceUsed = fs.traverse(
+  (path: FileSystemNode[], sizes: number[]) => {
+    const top = path.at(-1);
 
-  if (top?.isFile()) {
-    return top?.size ?? 0;
+    if (top?.isFile()) {
+      return top?.size ?? 0;
+    }
+
+    const size = sizes.reduce(sum, 0);
+    dirStats.push({ path, size });
+
+    return size;
   }
+);
 
-  const size = sizes.reduce(sum, 0);
+const spaceNeeded = UPDATE_SIZE - (FS_SIZE - totalSpaceUsed);
 
-  if (size < MAX_DIR_SIZE) {
-    filteredDirInfo.push({ path, size });
-  }
+console.log("Space used:", totalSpaceUsed);
+console.log("Space needed:", spaceNeeded);
 
-  return size;
-});
+const removalCandidates = dirStats
+  .filter((info) => info.size > spaceNeeded)
+  .sort(compareSizeAsc);
+const directoryForRemoval = removalCandidates[0];
 
-filteredDirInfo.forEach((info) => {
-  console.log(pathString(info.path), info.size);
-});
-
-console.log("Total:", filteredDirInfo.map((info) => info.size).reduce(sum, 0));
+console.log(
+  "Remove:",
+  pathString(directoryForRemoval.path),
+  `(size ${directoryForRemoval.size})`
+);
