@@ -1,5 +1,9 @@
 export type Vector2 = readonly [number, number];
 
+export function eq([ax, ay]: Vector2, [bx, by]: Vector2): boolean {
+  return ax === bx && ay === by;
+}
+
 export function add([ax, ay]: Vector2, [bx, by]: Vector2): Vector2 {
   return [ax + bx, ay + by];
 }
