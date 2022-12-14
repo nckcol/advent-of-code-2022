@@ -3,10 +3,10 @@ export type Tree<T> = {
   children: Tree<T>[];
 };
 
-export function create<T>(data: T): Tree<T> {
+export function create<T>(data: T, children: Tree<T>[] = []): Tree<T> {
   return {
     data,
-    children: [],
+    children,
   };
 }
 
