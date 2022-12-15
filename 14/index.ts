@@ -1,8 +1,10 @@
-import { delay } from "https://deno.land/std@0.136.0/async/delay.ts";
-import { ansi } from "https://deno.land/x/cliffy@v0.25.5/ansi/ansi.ts";
 import { tty } from "https://deno.land/x/cliffy@v0.25.5/ansi/tty.ts";
 import { invariant } from "../utils/invariant.ts";
 import * as vector from "../utils/vector2.ts";
+
+const ROCK_CHAR = "█";
+const AIR_CHAR = "░";
+const SAND_CHAR = "▓";
 
 function parseNumber(number: string): number {
   return parseInt(number, 10);
@@ -84,7 +86,7 @@ async function drawField(
     let row = "";
     for (let x = bbox[0][0]; x < bbox[1][0]; x++) {
       if (!field[y] || !field[y][x]) {
-        row += ".";
+        row += AIR_CHAR;
       } else {
         row += field[y][x];
       }
@@ -94,7 +96,7 @@ async function drawField(
 
   const encoder = new TextEncoder();
   tty.clearScreen();
-  await Deno.stdout.write(encoder.encode(rows.join("\n")));
+  await Deno.stdout.write(encoder.encode(rows.join("\n") + "\n"));
 }
 
 async function updateField(
@@ -112,12 +114,12 @@ async function updateField(
 
 function isFree(field: string[][], point: vector.Vector2) {
   const symbol = at(field, point);
-  return symbol !== "#" && symbol !== "o";
+  return symbol !== ROCK_CHAR && symbol !== SAND_CHAR;
 }
 
 const SCENE_BBOX = [
-  [490, 0],
-  [510, 12],
+  [480, 0],
+  [520, 11],
 ] as const;
 const SAND_SOURCE = [500, 0] as const;
 
@@ -130,7 +132,7 @@ async function main() {
   let max: vector.Vector2 = SAND_SOURCE;
   for (const polyline of polylineList) {
     for (let i = 0; i < polyline.length - 1; i++) {
-      createLine(field, polyline[i], polyline[i + 1], "#");
+      createLine(field, polyline[i], polyline[i + 1], ROCK_CHAR);
       min = [
         Math.min(min[0], polyline[i][0], polyline[i + 1][0]),
         Math.min(min[1], polyline[i][1], polyline[i + 1][1]),
@@ -144,14 +146,15 @@ async function main() {
 
   const bbox = [vector.add(min, [-2, 0]), vector.add(max, [2, 2])] as const;
 
+  // console.log(bbox);
   // await drawField(field, bbox);
-  // await drawField(field, SCENE_BBOX);
+  await drawField(field, SCENE_BBOX);
   let sand: vector.Vector2 | null = SAND_SOURCE;
   let sandCount = 1;
 
   while (isFree(field, SAND_SOURCE)) {
-    // await delay(20);
-    createPoint(field, sand, "o");
+    // await delay(50);
+    createPoint(field, sand, SAND_CHAR);
     // await updateField(field, bbox);
     // await updateField(field, SCENE_BBOX);
     const isBottom = vector.add(sand, [0, 1])[1] >= max[1] + 2;
@@ -172,7 +175,7 @@ async function main() {
   }
 
   console.log();
-  console.log(sandCount - 1);
+  console.log("Sand amount:", sandCount - 1);
 }
 
 await main();
