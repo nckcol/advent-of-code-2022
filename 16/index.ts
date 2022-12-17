@@ -113,6 +113,7 @@ function getDistance<T>(graph: Map<T, T[]>, start: T, end: T) {
 
 type State = {
   valve: string;
+  elValve?: string;
   opened: Set<string>;
   time: number;
   log: string[];
@@ -125,7 +126,7 @@ function open() {
       ...state,
       opened,
       time: state.time - 1,
-      log: [...state.log, `open ${state.valve}`],
+      // log: [...state.log, `open ${state.valve}`],
     };
   };
 }
@@ -136,7 +137,7 @@ function move(valve: string) {
       ...state,
       valve,
       time: state.time - 1,
-      log: [...state.log, `move ${state.valve} -> ${valve}`],
+      // log: [...state.log, `move ${state.valve} -> ${valve}`],
     };
   };
 }
@@ -146,8 +147,33 @@ function wait() {
     return {
       ...state,
       time: state.time - 1,
-      log: [...state.log, `wait`],
+      // log: [...state.log, `wait`],
     };
+  };
+}
+
+function elOpen() {
+  return function (state: State): State {
+    const opened = new Set(state.opened).add(state.elValve!);
+    return {
+      ...state,
+      opened,
+    };
+  };
+}
+
+function elMove(valve: string) {
+  return function (state: State): State {
+    return {
+      ...state,
+      elValve: valve,
+    };
+  };
+}
+
+function elWait() {
+  return function (state: State): State {
+    return state;
   };
 }
 
@@ -216,6 +242,108 @@ function wanderAround(
   });
 }
 
+function wanderAroundWithElephant(
+  graph: Map<string, string[]>,
+  flow: Map<string, number>,
+  start: string,
+  timeLeft: number
+) {
+  const cache: Map<
+    string,
+    Map<string, readonly [number, string[]]>
+  > = new Map();
+
+  function serializeHash(state: State) {
+    return [state.valve, state.elValve].join(":");
+  }
+
+  function serialize(state: State) {
+    return [state.time, Array.from(state.opened).sort().join(",")].join(":");
+  }
+
+  function iterate(state: State): readonly [number, string[]] {
+    if (state.time === 0) {
+      return [0, state.log] as const;
+    }
+
+    if (cache.has(serializeHash(state))) {
+      const table = cache.get(serializeHash(state))!;
+      if (table.has(serialize(state))) {
+        return table.get(serialize(state))!;
+      }
+    }
+
+    const rate = Array.from(state.opened.keys())
+      .map((valve) => flow.get(valve)!)
+      .reduce((a, b) => a + b, 0);
+
+    if (
+      Array.from(graph.keys())
+        .filter((valve) => flow.get(valve)! > 0)
+        .every((valve) => state.opened.has(valve))
+    ) {
+      const result = iterate(pipe(state, wait(), elWait()));
+      return [result[0] + rate, result[1]] as const;
+    }
+
+    const actions: Array<(state: State) => State> = [];
+    const elActions: Array<(state: State) => State> = [];
+
+    // my actions
+    const next = graph.get(state.valve)!;
+    actions.push(...next.map(move));
+
+    if (!state.opened.has(state.valve) && flow.get(state.valve)! > 0) {
+      actions.push(open());
+    }
+
+    // elephant actions
+    const nextEl = graph.get(state.elValve!)!;
+    elActions.push(...nextEl.map(elMove));
+
+    if (
+      !state.opened.has(state.elValve!) &&
+      flow.get(state.elValve!)! > 0 &&
+      // don't open the same valve
+      state.valve !== state.elValve
+    ) {
+      elActions.push(elOpen());
+    }
+
+    const results = [];
+
+    for (const action of actions) {
+      for (const elAction of elActions) {
+        results.push(iterate(pipe(state, action, elAction)));
+      }
+    }
+
+    const result = results.reduce((a, b) => {
+      if (a[0] >= b[0]) {
+        return a;
+      }
+      return b;
+    });
+
+    const cached = [result[0] + rate, result[1]] as const;
+
+    if (!cache.has(serializeHash(state))) {
+      cache.set(serializeHash(state), new Map());
+    }
+    cache.get(serializeHash(state))!.set(serialize(state), cached);
+
+    return cached;
+  }
+
+  return iterate({
+    valve: start,
+    elValve: start,
+    opened: new Set(),
+    time: timeLeft,
+    log: [],
+  });
+}
+
 async function main() {
   const input = await Deno.readTextFile("input.txt");
   const valves = parseInput(input);
@@ -228,10 +356,21 @@ async function main() {
     flow.set(valve.valve, valve.flowRate);
   });
 
-  const [result, log] = wanderAround(graph, flow, "AA", 30);
+  // const [result, log] = wanderAround(graph, flow, "AA", 30);
   // somehow log is BSing me, do not wanna debug it
-  console.log(log.join("\n"));
-  console.log(result);
+  // console.log(log.join("\n"));
+  // console.log(result);
+  // console.log();
+
+  console.log("With helpful elephant:");
+  const [resultWithElephant, logWithElephant] = wanderAroundWithElephant(
+    graph,
+    flow,
+    "AA",
+    26
+  );
+  console.log(logWithElephant.join("\n"));
+  console.log(resultWithElephant);
 }
 
 await main();
