@@ -63,3 +63,7 @@ export function rotateQ(angle: number): (v: Vector2) => Vector2 {
 }
 
 export const rotateQuarter = rotateQ(1);
+
+export function toString(v: Vector2): string {
+  return `(${v[0]},${v[1]})`;
+}
