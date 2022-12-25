@@ -69,52 +69,16 @@ export function fold<T, G, H>(
   return foldRose(tree);
 }
 
-async function main() {
-  const input = await Deno.readTextFile("input.txt");
-  const monkeys = parseInput(input);
-
-  const lookup: Map<
-    string,
-    tree.Tree<{
-      name: string;
-      expression?: NumberExpression | OperationExpression;
-    }>
-  > = new Map();
-  const orphans = new Set();
-
-  for (const [name, expression] of monkeys) {
-    if (!lookup.has(name)) {
-      lookup.set(name, tree.create({ name }));
-      orphans.add(name);
-    }
-
-    const t = lookup.get(name)!;
-    t.data.expression = expression;
-
-    if (isOperation(expression)) {
-      const [left, right] = expression.monkeys;
-      if (!lookup.has(left)) {
-        lookup.set(left, tree.create({ name: left }));
-      }
-      if (!lookup.has(right)) {
-        lookup.set(right, tree.create({ name: right }));
-      }
-      tree.addChild(t, lookup.get(left)!);
-      tree.addChild(t, lookup.get(right)!);
-
-      orphans.delete(left);
-      orphans.delete(right);
-    }
-  }
-
-  invariant(orphans.size === 1, "Expected exactly one root orphan");
-
-  const root = lookup.get("root")!;
-
-  const result = fold(
+function calculate(
+  root: tree.Tree<{
+    name: string;
+    expression?: NumberExpression | OperationExpression;
+  }>
+) {
+  return fold(
     root,
     (data, children: number[]) => {
-      console.log(data.name, data.expression, children);
+      // console.log(data.name, data.expression, children);
       invariant(data.expression);
       if (isOperation(data.expression)) {
         switch (data.expression.operation) {
@@ -161,10 +125,102 @@ async function main() {
     },
     (children: Array<{ name: string; expression: NumberExpression }>) =>
       children.map((child) => child.expression.number)
-  );
+  ).expression.number;
+}
 
-  console.log(draw(root));
+function solve(
+  root: tree.Tree<{
+    name: string;
+    expression?: NumberExpression | OperationExpression;
+  }>,
+  humn: tree.Tree<{
+    name: string;
+    expression?: NumberExpression | OperationExpression;
+  }>,
+  value: number
+) {
+  humn.data.expression = { number: value };
+  return calculate(root);
+}
+
+async function main() {
+  const input = await Deno.readTextFile("input.txt");
+  const monkeys = parseInput(input);
+
+  const lookup: Map<
+    string,
+    tree.Tree<{
+      name: string;
+      expression?: NumberExpression | OperationExpression;
+    }>
+  > = new Map();
+  const orphans = new Set();
+
+  for (const [name, expression] of monkeys) {
+    if (!lookup.has(name)) {
+      lookup.set(name, tree.create({ name }));
+      orphans.add(name);
+    }
+
+    const t = lookup.get(name)!;
+    t.data.expression = expression;
+
+    if (isOperation(expression)) {
+      const [left, right] = expression.monkeys;
+      if (!lookup.has(left)) {
+        lookup.set(left, tree.create({ name: left }));
+      }
+      if (!lookup.has(right)) {
+        lookup.set(right, tree.create({ name: right }));
+      }
+      tree.addChild(t, lookup.get(left)!);
+      tree.addChild(t, lookup.get(right)!);
+
+      orphans.delete(left);
+      orphans.delete(right);
+    }
+  }
+
+  invariant(orphans.size === 1, "Expected exactly one root orphan");
+
+  const root = lookup.get("root")!;
+
+  const result = calculate(root);
+
+  // console.log(draw(root));
   console.log(result);
+
+  invariant(root.data.expression);
+  invariant("operation" in root.data.expression);
+  root.data.expression.operation = "-";
+
+  const humn = lookup.get("humn")!;
+  humn.children = [];
+
+  let left = [0, solve(root, humn, 0)];
+  let right = [1, solve(root, humn, 1)];
+  let mid;
+  while (Math.sign(left[1]) === Math.sign(right[1])) {
+    left = right;
+    right = [right[0] * 2, solve(root, humn, right[0] * 2)];
+  }
+
+  while (1) {
+    const midValue = Math.ceil((left[0] + right[0]) / 2);
+    mid = [midValue, solve(root, humn, midValue)];
+    if (mid[1] === 0) {
+      break;
+    }
+    if (Math.sign(left[1]) === Math.sign(mid[1])) {
+      left = mid;
+    } else {
+      right = mid;
+    }
+  }
+
+  invariant(mid);
+
+  console.log(mid[0]);
 }
 
 await main();
