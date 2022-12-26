@@ -12,6 +12,10 @@ export function diff([ax, ay]: Vector2, [bx, by]: Vector2): Vector2 {
   return [ax - bx, ay - by];
 }
 
+export function scale([x, y]: Vector2, s: number): Vector2 {
+  return [x * s, y * s];
+}
+
 export function sig(x: number): number {
   if (x === 0) {
     return 0;
