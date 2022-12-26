@@ -177,6 +177,10 @@ function elWait() {
   };
 }
 
+function getValveRate(flow: Map<string, number>, opened: string[]) {
+  return opened.map((valve) => flow.get(valve)!).reduce((a, b) => a + b, 0);
+}
+
 function wanderAround(
   graph: Map<string, string[]>,
   flow: Map<string, number>,
@@ -344,11 +348,64 @@ function wanderAroundWithElephant(
   });
 }
 
+function relievePressure(
+  valves: string[],
+  flow: Map<string, number>,
+  weights: Map<string, number>,
+  start: string,
+  timeLeft: number
+) {
+  const results: Array<[string[], number]> = [];
+
+  function iterate(
+    valve: string,
+    opened: string[],
+    relieved: number,
+    timeLeft: number
+  ) {
+    if (timeLeft <= 0) {
+      results.push([opened, relieved]);
+      return;
+    }
+
+    let hasNext = false;
+    for (const next of valves) {
+      if (opened.includes(next)) {
+        continue;
+      }
+      const key = [valve, next].sort().join(";");
+      const dist = weights.get(key);
+      invariant(dist !== undefined);
+
+      if (dist <= 0 || dist + 1 > timeLeft) {
+        continue;
+      }
+
+      hasNext = true;
+      iterate(
+        next,
+        [...opened, next],
+        relieved + (dist + 1) * getValveRate(flow, opened),
+        timeLeft - (dist + 1)
+      );
+    }
+
+    if (!hasNext) {
+      results.push([opened, relieved + timeLeft * getValveRate(flow, opened)]);
+    }
+  }
+
+  iterate(start, [], 0, timeLeft);
+
+  return results.sort((a, b) => b[1] - a[1])[0];
+}
+
 async function main() {
   const input = await Deno.readTextFile("input.txt");
   const valves = parseInput(input);
 
   const graph = new Map<string, string[]>();
+  const weights: Map<string, number> = new Map();
   const flow = new Map<string, number>();
 
   valves.forEach(function (valve) {
@@ -356,21 +413,66 @@ async function main() {
     flow.set(valve.valve, valve.flowRate);
   });
 
-  // const [result, log] = wanderAround(graph, flow, "AA", 30);
+  const relevantValves = Array.from(flow.entries())
+    .filter(([_, flow]) => flow > 0)
+    .map(([valve]) => valve);
+
+  for (const valveA of relevantValves) {
+    for (const valveB of relevantValves) {
+      if (valveA === valveB) {
+        continue;
+      }
+      const key = [valveA, valveB].sort().join(";");
+      if (weights.has(key)) {
+        continue;
+      }
+      weights.set(key, getDistance(graph, valveA, valveB));
+    }
+  }
+
+  for (const valve of relevantValves) {
+    const key = ["AA", valve].sort().join(";");
+    if (weights.has(key)) {
+      continue;
+    }
+    weights.set(key, getDistance(graph, "AA", valve));
+  }
+
+  const [result, log] = wanderAround(graph, flow, "AA", 30);
   // somehow log is BSing me, do not wanna debug it
   // console.log(log.join("\n"));
-  // console.log(result);
-  // console.log();
+  console.log("Total pressure with human:", result);
+  console.log(
+    "or with more efficient search:",
+    relievePressure(relevantValves, flow, weights, "AA", 30)[1]
+  );
+  console.log();
 
-  console.log("With helpful elephant:");
-  const [resultWithElephant, logWithElephant] = wanderAroundWithElephant(
-    graph,
+  const humanResult = relievePressure(relevantValves, flow, weights, "AA", 26);
+
+  const elephantResult = relievePressure(
+    relevantValves.filter((valve) => !humanResult[0].includes(valve)),
     flow,
+    weights,
     "AA",
     26
   );
-  console.log(logWithElephant.join("\n"));
-  console.log(resultWithElephant);
+
+  console.log(
+    "Total pressure with human and elephant: ",
+    humanResult[1] + elephantResult[1]
+  );
+
+  // THIS METHOD IS TOO SLOW :(
+  // console.log("With helpful elephant:");
+  // const [resultWithElephant, logWithElephant] = wanderAroundWithElephant(
+  //   graph,
+  //   flow,
+  //   "AA",
+  //   26
+  // );
+  // console.log(logWithElephant.join("\n"));
+  // console.log(resultWithElephant);
 }
 
 await main();
